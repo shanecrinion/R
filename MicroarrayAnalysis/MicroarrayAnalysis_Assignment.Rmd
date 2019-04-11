@@ -1,0 +1,310 @@
+---
+title: 'Microarray Analysis: Inhibition of growth in A375 human melanoma cells.'
+author: "Shane Crinion"
+date: "01/10/2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+####**Introduction**
+
+The disregulation of glucose metabolism is one element that facilitates the growth of tumour cells. BRAF in cancerous cells can hijack glycolysis production which enables melanoma cells to proliferate. BRAF, the gene enocoding the B-Raf protein, helps tumour growth and its suppression may inhibit cancer development. By use of vemurafenib and glycotylic inhibitor DCA, A375 human melanoma cells have showed sensitivity and inhibition of BRAF mediated growth.
+
+The experiment indicates that inhibition of glycolysis via oncogenic BRAF deactivation has therapeutic potential for melanoma patients.
+
+
+####**Libraries**
+
+First of all, the libraries required are added. The library functions include:
+
+```{r message=F}
+
+library(oligo)
+library(pd.hugene.1.0.st.v1)
+library(hugene10sttranscriptcluster.db)
+library(limma)
+library(gplots)
+library(topGO)
+
+```
+
+The need for each library:
+
+* **Oligo** This is a library required for oligonucleotide analysis. We are performing analysis on Affymetrix microarrays (CEL files).
++ **pd.hugene.1.0.st.v1** This is used for annotation of data generated from Affymetrix HuGene-1.
++ **hugene10sttranscriptcluster.db** Also used for annotation of Affymetrix data.
++ **limma** Differential Expression Analysis. Allows analysis of multiple microarray analysees simultaneously. Used to create linear models for the microarray data. 
++ **gplots** Used to plot data. We use it for heatmap2 (enhanced) in this experiment to visualise the stuudy/cell relationship.
+
+ 
+#####**File Reading**
+
+```{r}
+#read the annotated file
+setwd("~/BKV/")
+pd <- read.AnnotatedDataFrame("pData.txt",sep=",")
+
+#add the slash so that formatting is corrected for reading in linux
+celfiles <- paste("./", rownames(pd),sep="")
+
+#read the cel files as raw files 
+rawData <- read.celfiles(celfiles, phenoData=pd)
+
+#read the norm data using rma
+normData <- rma(rawData, target="core")
+
+```
+
+####**Commands Used**
+
+* *setwd("/home/rstudio/BKV/").* 
+    - Set to this location because it's where I put all my files and the pData.txt file that I made.
++ *pd <- read.AnnotatedDataFrame("pData.txt",sep=",")* 
+    - Made this for R to read the CEL files containing the test ID, the sample ID and whether it is a test or control. 
++ *rawData <- read.celfiles(celfiles, phenoData=pd)* 
+    - This is used for: 
+    - First function is the "celfiles" which indicates the name of the read CEL file of microarray samples.
+    - **rawData** An object with 5 columns that comes from the Fast5Summary class
+    - It then reads "./" so that we can read all the files stated in the pData.txt file.
+    - The "phenoData=pd" is a description of experiment process.
+    - CEL (or TAR) indicates that it is an experiment.
+    - "A CEL file is a data file created by Affymetrix DNA microarray image analysis software. It contains the data extracted from "probes" on an Affymetrix GeneChip and can store thousands of data points, which may make it large in file size"
+    
+
+####**Functions used**
+
+* **pData**
+    - pdata(data, type, comment, metadata)
+    - extract phenotype data from a ballgown object
++ **fData** 
+    - Converts Raw Data Or Other Functional Data Classes Into Fdata Class.
+    - Choosing a daily representation, the fdata will contain a 30 elements long dates vector.
++ **exprs( )**
+    - Access the expression and error measurements of data stored in an object. The object must be of eSet class.
+    - Class To Contain High-Throughput Assays And Experimental Metadata
+    - Derived classes (e.g., ExpressionSet-class, SnpSet-class) specify which elements must be present in the assayData slot.
+
+####**Annotating the Data**
+
+```{r annotate data}
+
+featureData(normData) <- getNetAffx(normData, "transcript")
+geneData <- normData[fData(normData)[,"category"] %in% "main", ]
+
+```
+
+* *normData <- rma(rawData, target="core")*
+    - This is the robust microchip average algorithm.
+    - This is the preprocessing method
+    - "Object" is the first argument and it states that the file before hand is being used.
+    - The "target" argument indicates that the "core" is being summarized which is only for Exon/Gene arrays
+
++ **featureData** 
+    - Used to access experiment specific information. In this example, we are using this to access the experiment specific annotations.
++ **getNetAffx** 
+    - The annotation value that is taken accessed and attached to the information. This takes it from the main category and attaches it to main.
+
+
+####**Creating Plots**
+
+```{r}
+lab <- paste(pd$sampleID, pd$GID)
+boxplot(rawData, target="core", main="Raw Data", ylab="log2(exprs)", xlab="Control (0) vs. Case (1)", las=2)
+boxplot(geneData, main="Norm Data", ylab="log2(exprs)", names=lab, las=2)
+hist(geneData, main="Normalised Expression Density")
+heatmap.2(cor(exprs(geneData))^2, trace="none", scale="none", margins=c(9,9), labRow=lab,
+labCol=lab )
+colors <- as.numeric(factor(pd$GID))+1
+plotMDS(geneData, labels=lab, col=colors)
+
+```
+
+*Boxplots:* The boxplot is used to view the distribution of data. The dotted line indicates the minimum and maximum by the horizontal bar on each end. The 1st and 3rd quartile are seen by box length. The mean is represented by bold black line in the box. The raw data boxplot indicates that the Vemurafenib succesfully suppressed expression in BRAF melanoma cells. This is graphically represented by lower expression (Y-axis) in each case sample (G1) vs. the control (G0). The normalised data is used for clarity in comparing as is effective because the distribution is similar in each sample.
+  
+
+*Expression Density:* Expression density is used in microarray to visualise the level of expression in each array. The gene expression is measured via cDNA sample on a tiny spot on the slide. The graph is used to visualise the shape of the expression intensity. The data indicates that the intensity of expression is similar throughout. however we know from the boxplot that the levels are slightly less in the cancer cells. Normalising the data means the distribution is in ratio with the other value (intensity). Log values are used for normalising due to the smaller range.
+  
+
+*Heat Maps:* Heatmaps are used in microarray to reflect gene expression in each sample. The heatmap indicates the relationship between each variable, in this case being the relationship between case vs. control. The map indicates high contrast (read areas) between the case and control. The hierarchael clustering is used to represent the samples most closely related.
+
+
+*Multidimensional Scaling Plot of Gene Expression:* Tis is a log2 scaled plot which indicates the distance between each sample. The distance between each sample is the root-mean-square deviation. The control (green) vs. case (red) expression levels following microarray analysis can be seen in two distinct spectrums from this graph.
+
+----
+
+###Part Two: Linear Modelling and Gene Ontology Enrichment Analysis
+
+The types of analysis being performed are differential expression (using limma) and gene ontology (GO) term enrichment (using the topGO package).
+
+
+####**Linear Modelling**
+
+The linear model is created for our matrices.
+
+* *Linear models:* Linear models are used to analyse RNA models simulteneously by matrix assembly.
+
++ *Matrice:* Either 1 or 2 matrices are designed depending on what comparisons you would like to make between the RNA samples.
+
++ *Group-Means Parametrization:* This is one of two main approaches to designing a matrix for linear models. This methods uses separate coefficients to distinguish treatment (T)and control (C).  
+
+
+```{r linear modelling}
+#Create a design matrix for group-means model
+design <- cbind(
+G0=as.numeric(pd$GID=="G0"),
+G1=as.numeric(pd$GID=="G1")
+)
+#Calculate array weights and visualize with barplot, then fit the linear model
+aw <- arrayWeights(geneData, design)
+barplot(aw)
+fit <- lmFit(geneData, design, weight=aw)
+#Make a contrasts matrix for the sample comparisons we want to make and do the comparison
+#Calculate a moderated F-statistic
+cm <- makeContrasts(G1-G0, levels=design)
+fit2 <- contrasts.fit(fit, cm)
+fit2 <- eBayes(fit2)
+
+```
+
+####**Functions and code explained**
+
+* **Create a design matrix for group-means model**
+
+    - *as.numeric* is used to create a double precision vector. The length of the vector is then defined as the length of GO and G1. as.numeric assigns the value 1 to the appropriate value in line with Group-Means format. When we use *cbind()* is used to create a vector from the values and form the design matrix. 
+    
++ **Calculate array weights and visualize with barplot, then fit the linear model**
+
+    - *arrayWeights* is used to estimate the reliability of the arrays in the matrix by comparing them to the generated linear model. The function generates log weights for each array which can be seen by using View(aw). The "design" argument specifies the design matrix to adhere to which we just created as the variable named design. *barplot* shows the array weight that are generated. The higher weights have more reliability in reproducing the experiment. That means that in our example, the first G0 (control) sample generated the closest values to the linear model. *lmFit* then creates the linear model for each gene and in order to test their fold change from the theoretical value. The "weight" argument is assigned as the weights generated in variable. The values generated are log values based on the weight.
+    
++ **Make a contrasts matrix for the sample comparisons we want to make and do the comparison**
+
+    - *makeContrasts* makes the contrast matrix which we use to compare the case/control RNA samples and find out each sample has overexpression/underexpression. *contrasts.fit* generates the standard deviation and estimated coefficients from the linear model fit which is first argument "fit". The second argument "cm" is the contrasts which are used to assess differential expression. *eBayes* is used on the constructed linear model to generate t-statistics, F-statistic and log-odds of differential expression. The t-statistic indicates the distance of the estimated value from the hypothetical value. The F-test indicates how far the means are from each other in an ANOVA test.    
+
+```{r write DEG_list}
+
+#Create the top table for the comparison (coef) we want
+top<-topTable(fit2, coef=1, n=nrow(fit2))
+sig <- top[top$adj.P.Val <= 0.05 & abs(top$logFC) >=1,]
+
+#Create an excel-readable table with the specified columns for sig gene only
+#Note that we could subset out only thecolumns of interest if required
+
+write.table(sig, "DEG_list.csv", sep="", row.names=FALSE)
+  
+#Extract the expression values for the DEGs
+e <- exprs(geneData)
+sig_exprs<-e[rownames(e) %in% as.character(sig$transcriptclusterid),]
+
+```
+
+
+**Create the top table for the comparison (coef) we want**
+
+  * *topTable* uses the statistical information generated by eBayes to find the top ranked genes. The "coef" argument indicates that we are interested in column 1 which is the 28869 coefficient values. The *adj.P.Val* function generates a p value for each gene that is less that 0.05. The adjusted p-value accounts for the likelyhood of the gene occuring naturally and ensures that significant is creditable. By using *abs(top$logFC)* we ensure that the p-value is a positive value as you cannot have a negative probability. The result of using the *top* function is that now we have a subset containing genes that are significantly following correction and we have the logFC values to use as limits.  
+
+**Create an excel-readable table with the specified columns for sig gene only**
+
+  + *write.table* indicates that we want to generate a table. The arguments specify that it will contain the significant p-values from our samples, its name and file type (.csv is excel-readable) and that no headers are in the input data.
+
+**Extract the expression values for the DEGs**
+
+  + *exprs ()* is used to access expression and error measurements on the normalised version of the data to account for false positives and measure probability accurately. The row names (transcript cluster ID) are then changed from their numerical value to characters using *as.character* for significant expression value.
+####Plots 
+
+
+```{r volcano plot}
+#Create volcano plot for DEGs
+plot(top$logFC, -log10(top$adj.P.Val), pch="*", xlab="Log2 Fold Change", ylab="-10log (adjusted
+p-value)")
+abline(h=-log10(0.05), v=c(-1, 1), col="red", lty=2)
+points(sig$logFC, -log10(sig$adj.P.Val), col="red", pch="*")
+```
+
+
+*Volcano plot* is used to identify how much of the data is within the signifcant threshold for gene expression. The x-axis indicates the log2 fold change (FD) and the y-axis the log 10 p-values. The dotted red vertical and horizontal lines indicate the thresholds (Fold change +/- 1 and p-value = 0.05). The FD value is standard and then p-value is corrected to control false discovery rate.
+
+
+```{r fig.height=17, fig.width=5}
+heatmap.2(sig_exprs, trace="none", scale="row", col="redgreen", cexRow=0.2, cexCol=0.7)
+
+```
+
+
+*Heatmap* is used to visualise the gene expression level in each gene set. This is useful for visualising what gene types are present in the set. The contrasting colour blocks indicate that the group samples have common expression levels. The colours are based on regression from Z-score of 0. The Z-score indicates the number of standard deviations away from the mean within the samples. The green indicates higher expression, black indicates no change and red indicates lower expression. 
+
+The clustering indicates the relationship between group samples on the x-axis. The clustering indicates groups of genes that have similarity in expression pattern. 
+
+####**Final analysis**
+
+Additional libraries from Bioconductor are added to provide gene ontology testing tools:
+
+  * *topGO* provides further statistical values that can be used to differentiate between the GO terms that are generated and eliminate similarities in microarray enrichment analysis.
+
+  + *org.Hs.eg.db* is used for human genome wide annotation of the unique GenBank accession numbers and Entrez Gene identifiers.  
+
+  + *Rgraphviz* is used for plotting graphs in R and is used to visualise the gene ontology as nodes in order of their Fishers test results.
+
+  + *xtable* is used to create a table from the information which in this case.
+  
+  
+```{r message=F}
+library(topGO)
+library(org.Hs.eg.db)
+library(Rgraphviz)
+```
+
+
+```{r topGO analysis}
+#Select the significant genes
+topGO_list<-sig$adj.P.Val
+names(topGO_list)<-sig$transcriptclusterid
+#Replace transcript ID with gene symbol
+ids <- rownames(sig)
+syms <- unlist(mget(ids, hugene10sttranscriptclusterSYMBOL, ifnotfound=NA))
+TGL <- (topGO_list[names(syms)])
+names(TGL) <- syms
+
+#Run topGO analysis for "BP" (Biological Process)
+GOdata <- new("topGOdata", ontology = "BP", allGenes = TGL, geneSel = function(p) p < 0.01,
+description = "Test", annot = annFUN.org, mapping="org.Hs.eg", ID="Symbol")
+resultFisher <- runTest(GOdata, algorithm = "classic", statistic = "fisher")
+```
+```{r xtable, results="asis"}
+library(xtable)
+tab<-xtable(GenTable(GOdata, classicFisher = resultFisher, topNodes = 30))
+print(tab, type="html")
+
+```
+```{r xtable GOgraph}
+#Plot the GO graph, color nodes by significance
+showSigOfNodes(GOdata, score(resultFisher), firstSigNodes = 5, useInfo = "all")
+```
+
+**Select the significant genes**
+
+A list is compiled containing genes that are significant following correction. The names are then assigned using the variable "sig" that compiled only genes within FC and p-value threshold
+
+**Replace transcript ID with gene symbol**
+
+With the transcript cluster ID, we can now replace these with their unique gene symbol with the *unlist* and *mget* functions. The mget is used to generate a list of the gene IDs for the genes in question. The unlist function is then wrapped around to simplify the values of the list into a vector. 
+
+The "TGL" variable is then created to contain a list of the genes in "topGO_list" and then limited to only significant values with "names(TGL) <- syms".
+
+**Run topGO analysis for "BP" (Biological Process)**
+
+The *xtable* function is used to create a table containing ID, descriptions and statistical results for each significant GO.
+The GenTable function is used to create a summary of the enrichment analysis results using specific statistical functions. The functions specified are *classic Fisher* and *topNodes* means that the 30 most significant are selected. 
+* The Fisher test is used to measure the expected frequencies on more than 20 samples. The test indicates that the value of each significant GO is 1. This would suggest that no G0 is significantly enriched within our samples. By using less strict thresholds for the FC value, there are G0s that are found. Also, in other samples, the Fishers test is found to show a p-value below 0.05 indicating significance.
+
+**Plot the GO graph, color nodes by significance**
+
+The function *showSigOfNodes* is used to print the most significant nodes which plots the values by their Fisher result. The nodes depicted are all the same colour as they are all on the same level of significance however none are at a significant level. 
+
+###**Conclusion**
+
+The study finds that although expression in cancer cells is lower, there is no significant gene ontology found in this microarray study. The gene ontology study did not conclude that any functional group of genes that function together could be significantly associated with the cancer cells. 
