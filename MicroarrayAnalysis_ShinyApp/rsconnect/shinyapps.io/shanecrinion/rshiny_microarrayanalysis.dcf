@@ -1,0 +1,10 @@
+name: rshiny_microarrayanalysis
+title:
+username:
+account: shanecrinion
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 856580
+bundleId: 2002426
+url: https://shanecrinion.shinyapps.io/rshiny_microarrayanalysis/
+when: 1554966702.73794
